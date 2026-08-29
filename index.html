@@ -42,41 +42,38 @@ body{font-family:Segoe UI,Arial,sans-serif;background:radial-gradient(1200px 600
     <img id="goochiImg" src="assets/goochi-face.png" alt="GOOCHI">
     <div class="air-dot" id="airDot"></div>
   </div>
-
-  <div class="subs">
-    <div class="sub" id="subL"><div></div></div>
-    <div class="sub" id="subR"><div></div></div>
-  </div>
-
+  <div class="subs"><div class="sub" id="subL"><div></div></div><div class="sub" id="subR"><div></div></div></div>
   <div class="eq" id="eq"></div>
-
   <div class="controls">
     <button class="play" id="playBtn" aria-label="play"></button>
     <div class="meta">
-      <div class="statusline" id="status">GOOCHI 24/7</div>
-      <div class="track" id="track">Tuning in...</div>
+      <div class="statusline" id="status">Connecting...</div>
+      <div class="track" id="track">GOOCHI 24/7</div>
     </div>
   </div>
 </div>
-
 <audio id="audio" class="audio" controls preload="none"></audio>
 <script>
 const eq=document.getElementById('eq'),bars=32,eqels=[];
 for(let i=0;i<bars;i++){const s=document.createElement('span');eq.appendChild(s);eqels.push(s);}
-
 const audio=document.getElementById('audio');
 let ctx=null,analyser=null,data=null;
+const dot=document.getElementById('airDot');
+const statusEl=document.getElementById('status');
+const trackEl=document.getElementById('track');
 
-// Your 24/7 cloud stream. Uses port 8000 (direct streamer) so it plays
-// even if the web proxy on port 80 is unavailable.
-const STREAM='http://145.241.238.218:8000/stream';
+// ---- Auto-connect sources (tried in order, loops automatically) ----
+// 1. Cloud VPS stream (24/7 when VPS is up)
+// 2. Laptop LIVE stream (if reachable publicly)
+const SOURCES=[
+  {name:'24/7 Cloud', url:'http://145.241.238.218:8000/stream'},
+  {name:'LIVE Studio', url:'http://145.241.238.218:8000/goochi'},
+  {name:'LIVE Alt',    url:'http://145.241.238.218/goochi'}
+];
+let srcIdx=0, trying=false;
 
-function setStatus(live){
-  const d=document.getElementById('airDot');
-  d.className='air-dot '+(live?'live':'conn');
-  document.getElementById('status').textContent=live?'LIVE 24/7':'Reconnecting...';
-}
-setStatus(false);
+function setConnecting(name){dot.className='air-dot conn';statusEl.textContent='Connecting...';trackEl.textContent='Tuning into '+name+'...';}
+function setLive(name){dot.className='air-dot live';statusEl.textContent='LIVE 24/7';trackEl.textContent='GOOCHI 24/7';}
 
 function initAudio(){
   if(ctx)return;
@@ -87,25 +84,39 @@ function initAudio(){
   data=new Uint8Array(analyser.frequencyBinCount);
 }
 
-function play(){
+function tryConnect(){
+  if(trying)return;
+  trying=true;
+  const s=SOURCES[srcIdx];
+  setConnecting(s.name);
   initAudio();
-  audio.src=STREAM;
-  audio.play().then(()=>{setStatus(true);document.getElementById('playBtn').classList.add('playing');}).catch(()=>{setStatus(false);});
+  audio.src=s.url+'?t='+Date.now();
+  audio.play().then(()=>{
+    setLive(s.name);
+    document.getElementById('playBtn').classList.add('playing');
+    trying=false;
+  }).catch(()=>{
+    // move to next source and try again
+    srcIdx=(srcIdx+1)%SOURCES.length;
+    trying=false;
+  });
 }
 
 document.getElementById('playBtn').addEventListener('click',()=>{
   initAudio();
-  if(audio.paused){audio.play().then(()=>{setStatus(true);document.getElementById('playBtn').classList.add('playing');}).catch(()=>setStatus(false));}
-  else{audio.pause();document.getElementById('playBtn').classList.remove('playing');}
+  if(audio.paused){tryConnect();}
+  else{audio.pause();document.getElementById('playBtn').classList.remove('playing');dot.className='air-dot';statusEl.textContent='Paused';}
 });
 
-// Auto-reconnect: if the stream drops, keep trying every 3s and show LIVE when back.
+// Auto-heal: whenever audio stalls, drop to next source automatically
+audio.addEventListener('stalled',()=>{ if(!audio.paused){ srcIdx=(srcIdx+1)%SOURCES.length; tryConnect(); } });
+audio.addEventListener('error',()=>{ if(!audio.paused){ srcIdx=(srcIdx+1)%SOURCES.length; tryConnect(); } });
+audio.addEventListener('ended',()=>{ if(!audio.paused){ tryConnect(); } });
 setInterval(()=>{
   if(audio.paused)return;
-  if(audio.readyState===0){setStatus(false);audio.src=STREAM;
-    audio.play().then(()=>{setStatus(true);}).catch(()=>{});}
-  else setStatus(true);
-},3000);
+  if(audio.readyState===0){ srcIdx=(srcIdx+1)%SOURCES.length; tryConnect(); }
+  else setLive(SOURCES[srcIdx].name);
+},4000);
 
 // Beat-reactive animation
 function frame(){
@@ -120,7 +131,7 @@ function frame(){
 }
 function scale(id,f){const el=document.getElementById(id);const cone=el.firstElementChild;const s=1+f*0.8;cone.style.transform='scale('+s.toFixed(3)+')';el.style.transform='scale('+(1+f*0.06).toFixed(3)+')';}
 frame();
-play();
+tryConnect();
 </script>
 </body>
 </html>
