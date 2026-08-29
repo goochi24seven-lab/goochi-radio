@@ -16,23 +16,16 @@ body{font-family:Segoe UI,Arial,sans-serif;background:radial-gradient(1200px 600
 .wrap{position:relative;z-index:1;width:100%;max-width:560px;padding:20px 14px 60px;display:flex;flex-direction:column;align-items:center}
 .face-box{position:relative;width:min(92vw,480px);aspect-ratio:1/1;border-radius:24px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.06);margin-top:10px}
 .face-box img{width:100%;height:100%;object-fit:cover;display:block}
-.air-dot{position:absolute;top:12px;right:12px;width:16px;height:16px;border-radius:50%;background:#444;transition:.3s}
-.air-dot.live{background:#0f0;box-shadow:0 0 14px #0f0;animation:pulse 1.2s infinite}
-.air-dot.conn{background:#ffaa00;box-shadow:0 0 12px #ffaa00;animation:pulse 1.4s infinite}
+.air-dot{position:absolute;top:12px;right:12px;width:16px;height:16px;border-radius:50%;background:#0f0;box-shadow:0 0 14px #0f0;animation:pulse 1.2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
-.subs{display:flex;gap:22px;justify-content:center;margin-top:20px;transform-origin:center bottom}
-.sub{width:150px;height:150px;border-radius:50%;background:radial-gradient(circle at 38% 32%, #3a3a4a 0%, #0d0d15 60%, #000 100%);border:3px solid #2a2a3a;box-shadow:inset 0 -12px 30px rgba(0,0,0,.8),0 20px 40px rgba(0,0,0,.5),inset 0 8px 18px rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;position:relative}
-.sub::before{content:'';width:100px;height:100px;border-radius:50%;background:radial-gradient(circle at 40% 35%, #555 0%, #1a1a24 55%, #08080c 100%);border:2px solid #333;box-shadow:inset 0 -8px 16px rgba(0,0,0,.9);transform-origin:center;will-change:transform}
+.subs{display:flex;gap:22px;justify-content:center;margin-top:20px}
+.sub{width:150px;height:150px;border-radius:50%;background:radial-gradient(circle at 38% 32%, #3a3a4a 0%, #0d0d15 60%, #000 100%);border:3px solid #2a2a3a;display:flex;align-items:center;justify-content:center}
+.sub::before{content:'';width:100px;height:100px;border-radius:50%;background:radial-gradient(circle at 40% 35%, #555 0%, #1a1a24 55%, #08080c 100%);border:2px solid #333;transform-origin:center}
 .eq{display:flex;gap:5px;align-items:flex-end;height:46px;margin-top:22px;width:min(86vw,420px)}
-.eq span{flex:1;height:6px;background:linear-gradient(180deg,var(--cyan),var(--pink));border-radius:3px;transform-origin:bottom;will-change:transform;transition:height .06s ease-out}
-.controls{display:flex;align-items:center;gap:18px;margin-top:22px;width:min(86vw,420px)}
-.play{width:64px;height:64px;border-radius:50%;border:none;cursor:pointer;flex:0 0 auto;background:linear-gradient(135deg,var(--pink),var(--cyan));color:transparent;position:relative;box-shadow:0 10px 30px rgba(255,42,109,.35)}
-.play::after{content:'';position:absolute;left:24px;top:18px;border-left:14px solid #000;border-top:9px solid transparent;border-bottom:9px solid transparent}
-.play.playing::after{left:20px;top:17px;border:6px solid #000;width:14px;height:18px;background:transparent}
-.meta{display:flex;flex-direction:column;gap:6px;min-width:0;flex:1}
-.track{font-size:17px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 0 20px rgba(0,240,255,.3)}
-.statusline{font-size:11px;text-transform:uppercase;letter-spacing:2px;color:#8a8a9a}
-.audio{display:none}
+.eq span{flex:1;height:6px;background:linear-gradient(180deg,var(--cyan),var(--pink));border-radius:3px}
+.statusline{font-size:11px;text-transform:uppercase;letter-spacing:2px;color:#8a8a9a;margin-top:14px}
+.player{width:min(86vw,420px);margin-top:10px}
+.player audio{width:100%;}
 </style>
 </head>
 <body>
@@ -44,118 +37,51 @@ body{font-family:Segoe UI,Arial,sans-serif;background:radial-gradient(1200px 600
   </div>
   <div class="subs"><div class="sub" id="subL"><div></div></div><div class="sub" id="subR"><div></div></div></div>
   <div class="eq" id="eq"></div>
-  <div class="controls">
-    <button class="play" id="playBtn" aria-label="play"></button>
-    <div class="meta">
-      <div class="statusline" id="status">Connecting...</div>
-      <div class="track" id="track">GOOCHI 24/7</div>
-    </div>
+  <div class="statusline" id="status">GOOCHI 24/7</div>
+  <div class="player">
+    <audio id="audio" controls autoplay preload="auto"></audio>
   </div>
 </div>
-<audio id="audio" class="audio" controls preload="none"></audio>
 <script>
+const audio = document.getElementById('audio');
+const statusEl = document.getElementById('status');
+
+// Build decorative equalizer bars (visual only - does NOT touch the audio element)
 const eq=document.getElementById('eq'),bars=32,eqels=[];
 for(let i=0;i<bars;i++){const s=document.createElement('span');eq.appendChild(s);eqels.push(s);}
-const audio=document.getElementById('audio');
-let ctx=null,analyser=null,data=null;
-const dot=document.getElementById('airDot');
-const statusEl=document.getElementById('status');
-const trackEl=document.getElementById('track');
+let idle=true;
+setInterval(()=>{ for(let i=0;i<bars;i++){ eqels[i].style.height=(idle? (4+Math.random()*18) : (4+Math.random()*42))+'px'; } },90);
 
-// AUTO-CONNECT SOURCES - tries each until one plays, then keeps it.
-// 1. Local stream (works on the home WiFi)
-// 2. Public laptop stream (works for friends anywhere)
-// 3. Cloud VPS (24/7 when up)
+// List of working stream sources, tried in order until one plays.
 const SOURCES=[
-  {name:'LIVE Studio', url:'http://192.168.0.5:8000/goochi'},
-  {name:'LIVE Public', url:'http://90.207.62.227:8000/goochi'},
-  {name:'24/7 Cloud',  url:'http://145.241.238.218:8000/stream'}
+  'http://192.168.0.5:8000/goochi',
+  'http://90.207.62.227:8000/goochi',
+  'http://145.241.238.218:8000/stream'
 ];
-let srcIdx=0, trying=false;
+let srcIdx=0;
 
-const LIVE_INDEX = 0; // the first LIVE source is the one that "takes over" when on air
-
-function setConnecting(name){dot.className='air-dot conn';statusEl.textContent='Connecting...';trackEl.textContent='Tuning into '+name+'...';}
-function setLive(name){dot.className='air-dot live';statusEl.textContent='LIVE 24/7';trackEl.textContent='GOOCHI 24/7';}
-function setPaused(){dot.className='air-dot';statusEl.textContent='Paused';document.getElementById('playBtn').classList.remove('playing');}
-
-function initAudio(){
-  if(ctx)return;
-  ctx=new (window.AudioContext||window.webkitAudioContext)();
-  analyser=ctx.createAnalyser();analyser.fftSize=256;
-  const src=ctx.createMediaElementSource(audio);
-  src.connect(analyser);analyser.connect(ctx.destination);
-  data=new Uint8Array(analyser.frequencyBinCount);
+function attempt(idx){
+  const url = SOURCES[idx % SOURCES.length];
+  statusEl.textContent = 'Connecting to '+url.replace('http://','')+'...';
+  audio.src = url;
+  audio.play().then(()=>{ statusEl.textContent = 'LIVE 24/7'; idle=false; })
+   .catch(()=>{ statusEl.textContent = 'Tap play to start'; });
 }
 
-function tryConnect(){
-  if(trying)return;trying=true;
-  const s=SOURCES[srcIdx];
-  setConnecting(s.name);
-  initAudio();
-  audio.src=s.url+'?t='+Date.now();
-  audio.play().then(()=>{setLive(s.name);document.getElementById('playBtn').classList.add('playing');trying=false;})
-  .catch(()=>{srcIdx=(srcIdx+1)%SOURCES.length;trying=false;});
-}
+// Start trying on load
+attempt(0);
 
-// Lazy seek to force a live stream to move to a fresh spot if it stalls out.
-function forceLive(idx){
-  srcIdx = idx;
-  tryConnect();
-}
+// If it fails, advance to next source
+audio.addEventListener('error', ()=>{ srcIdx++; setTimeout(()=>attempt(srcIdx), 800); });
+audio.addEventListener('stalled', ()=>{ if(audio.currentTime===0 && audio.networkState===3){ srcIdx++; attempt(srcIdx);} });
 
-// --- auto-play on load: start muted (browsers allow muted autoplay) then unmute ---
-function autoplay(){
-  initAudio();
-  audio.muted = true;
-  tryConnect();
-  // after we open a working source, try to unmute so sound actually plays.
-  // If the browser blocks unmute, the user can tap the play button once.
-  setTimeout(()=>{ try{ audio.muted=false; }catch(_){ } }, 1200);
-}
-
-// --- tap/click starts (or resumes) playback - this is the user gesture browsers trust ---
-document.getElementById('playBtn').addEventListener('click',()=>{
-  initAudio();
-  if(ctx && ctx.state==='suspended'){ ctx.resume(); }
-  audio.muted=false;
-  if(audio.paused){ tryConnect(); }
-  else{ audio.pause(); setPaused(); }
-});
-
-// --- live auto-takeover: whenever a LIVE source comes online, switch to it ---
-// Every 5s, probe the LIVE sources; if they respond, bring the player over to them.
-const probe = new Image();
-let liveUpToDate = null;
-const LIVE_URLS = [SOURCES[LIVE_INDEX].url, SOURCES[0].url, SOURCES[1].url].filter((v,i,a)=>a.indexOf(v)===i);
-function probeLive(){
-  // quick HEAD-like probe by fetching a couple bytes; on success mark live up
-  LIVE_URLS.forEach(u=>{
-    fetch(u+'?p='+Date.now(),{method:'GET'}).then(r=>{
-      if(r.ok){ liveUpToDate = u; }
-    }).catch(_=>{});
-  });
-}
-setInterval(probeLive, 6000);
-
-audio.addEventListener('stalled',()=>{if(!audio.paused){srcIdx=(srcIdx+1)%SOURCES.length;tryConnect();}});
-audio.addEventListener('error',()=>{if(!audio.paused){srcIdx=(srcIdx+1)%SOURCES.length;tryConnect();}});
-audio.addEventListener('ended',()=>{if(!audio.paused){tryConnect();}});
-setInterval(()=>{if(audio.paused)return;if(audio.readyState===0){srcIdx=(srcIdx+1)%SOURCES.length;tryConnect();}else setLive(SOURCES[srcIdx].name);},4000);
-
-function frame(){
-  requestAnimationFrame(frame);
-  let kick=0;
-  if(analyser&&data&&!audio.paused){analyser.getByteFrequencyData(data);for(let i=0;i<6;i++)kick+=data[i];kick/=6*255;}
-  const punch=Math.max(kick*2.2,audio&&!audio.paused?0.35:0.12);
-  scale('subL',punch);scale('subR',punch);
-  const use=data&&!audio.paused;
-  if(use){const step=Math.max(1,Math.floor(data.length/bars));for(let i=0;i<bars;i++){const v=data[i*step]/255;eqels[i].style.height=(4+v*42)+'px';}}
-  else{for(let i=0;i<bars;i++){const v=0.06+Math.random()*0.15;eqels[i].style.height=(4+v*42)+'px';}}
-}
-function scale(id,f){const el=document.getElementById(id);const cone=el.firstElementChild;const s=1+f*0.8;cone.style.transform='scale('+s.toFixed(3)+')';el.style.transform='scale('+(1+f*0.06).toFixed(3)+')';}
-frame();
-autoplay();
+// Subs beat pulse (visual only) - drives off audio playback state
+setInterval(()=>{
+  const playing = !audio.paused && !audio.ended;
+  const d = playing ? (1+Math.random()*0.35) : 1;
+  document.getElementById('subL').firstElementChild.style.transform='scale('+d+')';
+  document.getElementById('subR').firstElementChild.style.transform='scale('+d+')';
+},120);
 </script>
 </body>
 </html>
