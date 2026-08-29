@@ -63,12 +63,13 @@ const statusEl=document.getElementById('status');
 const trackEl=document.getElementById('track');
 
 // ---- Auto-connect sources (tried in order, loops automatically) ----
-// 1. Cloud VPS stream (24/7 when VPS is up)
-// 2. Laptop LIVE stream (if reachable publicly)
+// 1. Cloud VPS stream (24/7 cloud host when up)
+// 2. Laptop LIVE stream (public, via router port-forward) - your strongest always-on
+// 3. Cloud VPS on the other port as a fallback
 const SOURCES=[
-  {name:'24/7 Cloud', url:'http://145.241.238.218:8000/stream'},
-  {name:'LIVE Studio', url:'http://145.241.238.218:8000/goochi'},
-  {name:'LIVE Alt',    url:'http://145.241.238.218/goochi'}
+  {name:'LIVE Studio', url:'http://90.207.62.227:8000/goochi'},
+  {name:'24/7 Cloud',  url:'http://145.241.238.218:8000/stream'},
+  {name:'Cloud Alt',   url:'http://145.241.238.218:8000/goochi'}
 ];
 let srcIdx=0, trying=false;
 
