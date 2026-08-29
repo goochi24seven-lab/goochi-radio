@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#05050a">
+<title>GOOCHI 24/7</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#128266;</text></svg>">
+<style>
+:root{--pink:#ff2a6d; --cyan:#00f0ff;}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{font-family:Segoe UI,Arial,sans-serif;background:radial-gradient(1200px 600px at 50% -10%, #1a1030 0%, transparent 60%),linear-gradient(180deg,#05050a 0%,#0a0a14 100%);color:#fff;overflow-x:hidden;display:flex;flex-direction:column;align-items:center}
+.glow{position:fixed;filter:blur(120px);opacity:.25;z-index:0;width:500px;height:500px;border-radius:50%}
+.g1{background:var(--pink);top:-150px;left:-100px}.g2{background:var(--cyan);bottom:-150px;right:-100px}
+.wrap{position:relative;z-index:1;width:100%;max-width:560px;padding:20px 14px 60px;display:flex;flex-direction:column;align-items:center}
+.face-box{position:relative;width:min(92vw,480px);aspect-ratio:1/1;border-radius:24px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.06);margin-top:10px}
+.face-box img{width:100%;height:100%;object-fit:cover;display:block}
+.air-dot{position:absolute;top:12px;right:12px;width:16px;height:16px;border-radius:50%;background:#444;transition:.3s}
+.air-dot.live{background:#0f0;box-shadow:0 0 14px #0f0;animation:pulse 1.2s infinite}
+.air-dot.conn{background:#ffaa00;box-shadow:0 0 12px #ffaa00;animation:pulse 1.4s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.subs{display:flex;gap:22px;justify-content:center;margin-top:20px;transform-origin:center bottom}
+.sub{width:150px;height:150px;border-radius:50%;background:radial-gradient(circle at 38% 32%, #3a3a4a 0%, #0d0d15 60%, #000 100%);border:3px solid #2a2a3a;box-shadow:inset 0 -12px 30px rgba(0,0,0,.8),0 20px 40px rgba(0,0,0,.5),inset 0 8px 18px rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;position:relative}
+.sub::before{content:'';width:100px;height:100px;border-radius:50%;background:radial-gradient(circle at 40% 35%, #555 0%, #1a1a24 55%, #08080c 100%);border:2px solid #333;box-shadow:inset 0 -8px 16px rgba(0,0,0,.9);transform-origin:center;will-change:transform}
+.eq{display:flex;gap:5px;align-items:flex-end;height:46px;margin-top:22px;width:min(86vw,420px)}
+.eq span{flex:1;height:6px;background:linear-gradient(180deg,var(--cyan),var(--pink));border-radius:3px;transform-origin:bottom;will-change:transform;transition:height .06s ease-out}
+.controls{display:flex;align-items:center;gap:18px;margin-top:22px;width:min(86vw,420px)}
+.play{width:64px;height:64px;border-radius:50%;border:none;cursor:pointer;flex:0 0 auto;background:linear-gradient(135deg,var(--pink),var(--cyan));color:transparent;position:relative;box-shadow:0 10px 30px rgba(255,42,109,.35)}
+.play::after{content:'';position:absolute;left:24px;top:18px;border-left:14px solid #000;border-top:9px solid transparent;border-bottom:9px solid transparent}
+.play.playing::after{left:20px;top:17px;border:6px solid #000;width:14px;height:18px;background:transparent}
+.meta{display:flex;flex-direction:column;gap:6px;min-width:0;flex:1}
+.track{font-size:17px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 0 20px rgba(0,240,255,.3)}
+.statusline{font-size:11px;text-transform:uppercase;letter-spacing:2px;color:#8a8a9a}
+.audio{display:none}
+</style>
+</head>
+<body>
+<div class="glow g1"></div><div class="glow g2"></div>
+<div class="wrap">
+  <div class="face-box">
+    <img id="goochiImg" src="assets/goochi-face.png" alt="GOOCHI">
+    <div class="air-dot" id="airDot"></div>
+  </div>
+
+  <div class="subs">
+    <div class="sub" id="subL"><div></div></div>
+    <div class="sub" id="subR"><div></div></div>
+  </div>
+
+  <div class="eq" id="eq"></div>
+
+  <div class="controls">
+    <button class="play" id="playBtn" aria-label="play"></button>
+    <div class="meta">
+      <div class="statusline" id="status">GOOCHI 24/7</div>
+      <div class="track" id="track">Tuning in...</div>
+    </div>
+  </div>
+</div>
+
+<audio id="audio" class="audio" controls preload="none"></audio>
+<script>
+const eq=document.getElementById('eq'),bars=32,eqels=[];
+for(let i=0;i<bars;i++){const s=document.createElement('span');eq.appendChild(s);eqels.push(s);}
+
+const audio=document.getElementById('audio');
+let ctx=null,analyser=null,data=null;
+
+// Your 24/7 cloud stream. Uses port 8000 (direct streamer) so it plays
+// even if the web proxy on port 80 is unavailable.
+const STREAM='http://145.241.238.218:8000/stream';
+
+function setStatus(live){
+  const d=document.getElementById('airDot');
+  d.className='air-dot '+(live?'live':'conn');
+  document.getElementById('status').textContent=live?'LIVE 24/7':'Reconnecting...';
+}
+setStatus(false);
+
+function initAudio(){
+  if(ctx)return;
+  ctx=new (window.AudioContext||window.webkitAudioContext)();
+  analyser=ctx.createAnalyser();analyser.fftSize=256;
+  const src=ctx.createMediaElementSource(audio);
+  src.connect(analyser);analyser.connect(ctx.destination);
+  data=new Uint8Array(analyser.frequencyBinCount);
+}
+
+function play(){
+  initAudio();
+  audio.src=STREAM;
+  audio.play().then(()=>{setStatus(true);document.getElementById('playBtn').classList.add('playing');}).catch(()=>{setStatus(false);});
+}
+
+document.getElementById('playBtn').addEventListener('click',()=>{
+  initAudio();
+  if(audio.paused){audio.play().then(()=>{setStatus(true);document.getElementById('playBtn').classList.add('playing');}).catch(()=>setStatus(false));}
+  else{audio.pause();document.getElementById('playBtn').classList.remove('playing');}
+});
+
+// Auto-reconnect: if the stream drops, keep trying every 3s and show LIVE when back.
+setInterval(()=>{
+  if(audio.paused)return;
+  if(audio.readyState===0){setStatus(false);audio.src=STREAM;
+    audio.play().then(()=>{setStatus(true);}).catch(()=>{});}
+  else setStatus(true);
+},3000);
+
+// Beat-reactive animation
+function frame(){
+  requestAnimationFrame(frame);
+  let kick=0;
+  if(analyser&&data&&!audio.paused){analyser.getByteFrequencyData(data);for(let i=0;i<6;i++)kick+=data[i];kick/=6*255;}
+  const punch=Math.max(kick*2.2,audio&&!audio.paused?0.35:0.12);
+  scale('subL',punch);scale('subR',punch);
+  const use=data&&!audio.paused;
+  if(use){const step=Math.max(1,Math.floor(data.length/bars));for(let i=0;i<bars;i++){const v=data[i*step]/255;eqels[i].style.height=(4+v*42)+'px';}}
+  else{for(let i=0;i<bars;i++){const v=0.06+Math.random()*0.15;eqels[i].style.height=(4+v*42)+'px';}}
+}
+function scale(id,f){const el=document.getElementById(id);const cone=el.firstElementChild;const s=1+f*0.8;cone.style.transform='scale('+s.toFixed(3)+')';el.style.transform='scale('+(1+f*0.06).toFixed(3)+')';}
+frame();
+play();
+</script>
+</body>
+</html>
