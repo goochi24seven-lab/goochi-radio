@@ -62,14 +62,14 @@ const dot=document.getElementById('airDot');
 const statusEl=document.getElementById('status');
 const trackEl=document.getElementById('track');
 
-// ---- Auto-connect sources (tried in order, loops automatically) ----
-// 1. Cloud VPS stream (24/7 cloud host when up)
-// 2. Laptop LIVE stream (public, via router port-forward) - your strongest always-on
-// 3. Cloud VPS on the other port as a fallback
+// AUTO-CONNECT SOURCES - tries each until one plays, then keeps it.
+// 1. Local stream (works on the home WiFi)
+// 2. Public laptop stream (works for friends anywhere)
+// 3. Cloud VPS (24/7 when up)
 const SOURCES=[
-  {name:'LIVE Studio', url:'http://90.207.62.227:8000/goochi'},
-  {name:'24/7 Cloud',  url:'http://145.241.238.218:8000/stream'},
-  {name:'Cloud Alt',   url:'http://145.241.238.218:8000/goochi'}
+  {name:'LIVE Studio', url:'http://192.168.0.5:8000/goochi'},
+  {name:'LIVE Public', url:'http://90.207.62.227:8000/goochi'},
+  {name:'24/7 Cloud',  url:'http://145.241.238.218:8000/stream'}
 ];
 let srcIdx=0, trying=false;
 
@@ -84,42 +84,19 @@ function initAudio(){
   src.connect(analyser);analyser.connect(ctx.destination);
   data=new Uint8Array(analyser.frequencyBinCount);
 }
-
 function tryConnect(){
-  if(trying)return;
-  trying=true;
+  if(trying)return;trying=true;
   const s=SOURCES[srcIdx];
-  setConnecting(s.name);
-  initAudio();
+  setConnecting(s.name);initAudio();
   audio.src=s.url+'?t='+Date.now();
-  audio.play().then(()=>{
-    setLive(s.name);
-    document.getElementById('playBtn').classList.add('playing');
-    trying=false;
-  }).catch(()=>{
-    // move to next source and try again
-    srcIdx=(srcIdx+1)%SOURCES.length;
-    trying=false;
-  });
+  audio.play().then(()=>{setLive(s.name);document.getElementById('playBtn').classList.add('playing');trying=false;})
+  .catch(()=>{srcIdx=(srcIdx+1)%SOURCES.length;trying=false;});
 }
-
-document.getElementById('playBtn').addEventListener('click',()=>{
-  initAudio();
-  if(audio.paused){tryConnect();}
-  else{audio.pause();document.getElementById('playBtn').classList.remove('playing');dot.className='air-dot';statusEl.textContent='Paused';}
-});
-
-// Auto-heal: whenever audio stalls, drop to next source automatically
-audio.addEventListener('stalled',()=>{ if(!audio.paused){ srcIdx=(srcIdx+1)%SOURCES.length; tryConnect(); } });
-audio.addEventListener('error',()=>{ if(!audio.paused){ srcIdx=(srcIdx+1)%SOURCES.length; tryConnect(); } });
-audio.addEventListener('ended',()=>{ if(!audio.paused){ tryConnect(); } });
-setInterval(()=>{
-  if(audio.paused)return;
-  if(audio.readyState===0){ srcIdx=(srcIdx+1)%SOURCES.length; tryConnect(); }
-  else setLive(SOURCES[srcIdx].name);
-},4000);
-
-// Beat-reactive animation
+document.getElementById('playBtn').addEventListener('click',()=>{initAudio();if(audio.paused){tryConnect();}else{audio.pause();document.getElementById('playBtn').classList.remove('playing');dot.className='air-dot';statusEl.textContent='Paused';}});
+audio.addEventListener('stalled',()=>{if(!audio.paused){srcIdx=(srcIdx+1)%SOURCES.length;tryConnect();}});
+audio.addEventListener('error',()=>{if(!audio.paused){srcIdx=(srcIdx+1)%SOURCES.length;tryConnect();}});
+audio.addEventListener('ended',()=>{if(!audio.paused){tryConnect();}});
+setInterval(()=>{if(audio.paused)return;if(audio.readyState===0){srcIdx=(srcIdx+1)%SOURCES.length;tryConnect();}else setLive(SOURCES[srcIdx].name);},4000);
 function frame(){
   requestAnimationFrame(frame);
   let kick=0;
