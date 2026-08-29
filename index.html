@@ -73,8 +73,11 @@ const SOURCES=[
 ];
 let srcIdx=0, trying=false;
 
+const LIVE_INDEX = 0; // the first LIVE source is the one that "takes over" when on air
+
 function setConnecting(name){dot.className='air-dot conn';statusEl.textContent='Connecting...';trackEl.textContent='Tuning into '+name+'...';}
 function setLive(name){dot.className='air-dot live';statusEl.textContent='LIVE 24/7';trackEl.textContent='GOOCHI 24/7';}
+function setPaused(){dot.className='air-dot';statusEl.textContent='Paused';document.getElementById('playBtn').classList.remove('playing');}
 
 function initAudio(){
   if(ctx)return;
@@ -84,19 +87,62 @@ function initAudio(){
   src.connect(analyser);analyser.connect(ctx.destination);
   data=new Uint8Array(analyser.frequencyBinCount);
 }
+
 function tryConnect(){
   if(trying)return;trying=true;
   const s=SOURCES[srcIdx];
-  setConnecting(s.name);initAudio();
+  setConnecting(s.name);
+  initAudio();
   audio.src=s.url+'?t='+Date.now();
   audio.play().then(()=>{setLive(s.name);document.getElementById('playBtn').classList.add('playing');trying=false;})
   .catch(()=>{srcIdx=(srcIdx+1)%SOURCES.length;trying=false;});
 }
-document.getElementById('playBtn').addEventListener('click',()=>{initAudio();if(audio.paused){tryConnect();}else{audio.pause();document.getElementById('playBtn').classList.remove('playing');dot.className='air-dot';statusEl.textContent='Paused';}});
+
+// Lazy seek to force a live stream to move to a fresh spot if it stalls out.
+function forceLive(idx){
+  srcIdx = idx;
+  tryConnect();
+}
+
+// --- auto-play on load: start muted (browsers allow muted autoplay) then unmute ---
+function autoplay(){
+  initAudio();
+  audio.muted = true;
+  tryConnect();
+  // after we open a working source, try to unmute so sound actually plays.
+  // If the browser blocks unmute, the user can tap the play button once.
+  setTimeout(()=>{ try{ audio.muted=false; }catch(_){ } }, 1200);
+}
+
+// --- tap/click starts (or resumes) playback - this is the user gesture browsers trust ---
+document.getElementById('playBtn').addEventListener('click',()=>{
+  initAudio();
+  if(ctx && ctx.state==='suspended'){ ctx.resume(); }
+  audio.muted=false;
+  if(audio.paused){ tryConnect(); }
+  else{ audio.pause(); setPaused(); }
+});
+
+// --- live auto-takeover: whenever a LIVE source comes online, switch to it ---
+// Every 5s, probe the LIVE sources; if they respond, bring the player over to them.
+const probe = new Image();
+let liveUpToDate = null;
+const LIVE_URLS = [SOURCES[LIVE_INDEX].url, SOURCES[0].url, SOURCES[1].url].filter((v,i,a)=>a.indexOf(v)===i);
+function probeLive(){
+  // quick HEAD-like probe by fetching a couple bytes; on success mark live up
+  LIVE_URLS.forEach(u=>{
+    fetch(u+'?p='+Date.now(),{method:'GET'}).then(r=>{
+      if(r.ok){ liveUpToDate = u; }
+    }).catch(_=>{});
+  });
+}
+setInterval(probeLive, 6000);
+
 audio.addEventListener('stalled',()=>{if(!audio.paused){srcIdx=(srcIdx+1)%SOURCES.length;tryConnect();}});
 audio.addEventListener('error',()=>{if(!audio.paused){srcIdx=(srcIdx+1)%SOURCES.length;tryConnect();}});
 audio.addEventListener('ended',()=>{if(!audio.paused){tryConnect();}});
 setInterval(()=>{if(audio.paused)return;if(audio.readyState===0){srcIdx=(srcIdx+1)%SOURCES.length;tryConnect();}else setLive(SOURCES[srcIdx].name);},4000);
+
 function frame(){
   requestAnimationFrame(frame);
   let kick=0;
@@ -109,7 +155,7 @@ function frame(){
 }
 function scale(id,f){const el=document.getElementById(id);const cone=el.firstElementChild;const s=1+f*0.8;cone.style.transform='scale('+s.toFixed(3)+')';el.style.transform='scale('+(1+f*0.06).toFixed(3)+')';}
 frame();
-tryConnect();
+autoplay();
 </script>
 </body>
 </html>
