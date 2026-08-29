@@ -10,49 +10,106 @@
 :root{--pink:#ff2a6d; --cyan:#00f0ff;}
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%}
-body{font-family:Segoe UI,Arial,sans-serif;background:radial-gradient(1200px 600px at 50% -10%, #1a1030 0%, transparent 60%),linear-gradient(180deg,#05050a 0%,#0a0a14 100%);color:#fff;overflow-x:hidden;display:flex;flex-direction:column;align-items:center}
-.glow{position:fixed;filter:blur(120px);opacity:.25;z-index:0;width:500px;height:500px;border-radius:50%}
-.g1{background:var(--pink);top:-150px;left:-100px}.g2{background:var(--cyan);bottom:-150px;right:-100px}
-.wrap{position:relative;z-index:1;width:100%;max-width:560px;padding:20px 14px 60px;display:flex;flex-direction:column;align-items:center}
-.face-box{position:relative;width:min(92vw,480px);aspect-ratio:1/1;border-radius:24px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.06);margin-top:10px}
-.face-box img{width:100%;height:100%;object-fit:cover;display:block}
-.air-dot{position:absolute;top:12px;right:12px;width:16px;height:16px;border-radius:50%;background:#0f0;box-shadow:0 0 14px #0f0;animation:pulse 1.2s infinite}
+body{
+  font-family:Segoe UI,Arial,sans-serif;
+  background:radial-gradient(1200px 600px at 50% -10%, #1a1030 0%, transparent 60%),linear-gradient(180deg,#05050a 0%,#0a0a14 100%);
+  color:#fff;overflow-x:hidden;display:flex;align-items:center;justify-content:center;min-height:100vh;
+}
+.glow{position:fixed;filter:blur(120px);opacity:.3;z-index:0;width:500px;height:500px;border-radius:50%}
+.g1{background:var(--pink);top:-150px;left:-100px}
+.g2{background:var(--cyan);bottom:-150px;right:-100px}
+
+/* Picture = the MAIN screen, fills the page */
+.screen{
+  position:relative;z-index:1;
+  width:min(100vw,100vh);           /* square screen, as big as possible */
+  aspect-ratio:1/1;
+  border-radius:0;
+  overflow:hidden;
+  background:#000;
+}
+.screen img{width:100%;height:100%;object-fit:cover;display:block}
+
+/* ON AIR dot (top-right on the picture) */
+.air-dot{
+  position:absolute;top:14px;right:14px;width:14px;height:14px;border-radius:50%;
+  background:#ff2a6d;box-shadow:0 0 12px #ff2a6d;animation:pulse 1.2s infinite;
+}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
-.subs{display:flex;gap:22px;justify-content:center;margin-top:20px}
-.sub{width:150px;height:150px;border-radius:50%;background:radial-gradient(circle at 38% 32%, #3a3a4a 0%, #0d0d15 60%, #000 100%);border:3px solid #2a2a3a;display:flex;align-items:center;justify-content:center}
-.sub::before{content:'';width:100px;height:100px;border-radius:50%;background:radial-gradient(circle at 40% 35%, #555 0%, #1a1a24 55%, #08080c 100%);border:2px solid #333;transform-origin:center}
-.eq{display:flex;gap:5px;align-items:flex-end;height:46px;margin-top:22px;width:min(86vw,420px)}
-.eq span{flex:1;height:6px;background:linear-gradient(180deg,var(--cyan),var(--pink));border-radius:3px}
-.statusline{font-size:11px;text-transform:uppercase;letter-spacing:2px;color:#8a8a9a;margin-top:14px}
-.player{width:min(86vw,420px);margin-top:10px}
-.player audio{width:100%;}
+
+/* Big floating title over the picture */
+.brand{
+  position:absolute;top:16px;left:16px;font-size:12px;letter-spacing:4px;font-weight:800;
+  text-transform:uppercase;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.9);
+}
+
+/* ==== EQUALIZER = the speakers IN the picture, overlaid at the bottom ==== */
+.eqbox{
+  position:absolute;left:0;right:0;bottom:0;
+  padding:18px 16px 14px;
+  background:linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,.75) 100%);
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+}
+.eq{display:flex;gap:4px;align-items:flex-end;height:54px;width:100%}
+.eq span{
+  flex:1;height:4px;border-radius:2px;
+  background:linear-gradient(180deg,var(--cyan),var(--pink));
+  box-shadow:0 0 8px rgba(0,240,255,.4);
+  transform-origin:bottom;will-change:transform;transition:height .06s ease-out;
+}
+.statusline{
+  font-size:10px;text-transform:uppercase;letter-spacing:3px;color:#fff;
+  text-shadow:0 1px 6px rgba(0,0,0,.9);
+}
+
+/* The native audio control (hidden visuals, we style separately) - keep it for reliability */
+.player{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:3;opacity:.92;width:min(88vw,420px);filter:drop-shadow(0 4px 18px rgba(0,0,0,.6))}
+.player audio{width:100%}
 </style>
 </head>
 <body>
 <div class="glow g1"></div><div class="glow g2"></div>
-<div class="wrap">
-  <div class="face-box">
-    <img id="goochiImg" src="assets/goochi-face.png" alt="GOOCHI">
-    <div class="air-dot" id="airDot"></div>
-  </div>
-  <div class="subs"><div class="sub" id="subL"><div></div></div><div class="sub" id="subR"><div></div></div></div>
-  <div class="eq" id="eq"></div>
-  <div class="statusline" id="status">GOOCHI 24/7</div>
-  <div class="player">
-    <audio id="audio" controls autoplay preload="auto"></audio>
+
+<div class="screen">
+  <img src="assets/goochi-face.png" alt="GOOCHI">
+  <div class="brand">GOOCHI 24/7</div>
+  <div class="air-dot"></div>
+
+  <!-- Speakers/equalizer ON the picture, reacting to the real music -->
+  <div class="eqbox">
+    <div class="eq" id="eq"></div>
+    <div class="statusline" id="status">GOOCHI 24/7</div>
   </div>
 </div>
+
+<div class="player">
+  <audio id="audio" controls autoplay preload="auto" crossorigin="anonymous"></audio>
+</div>
+
 <script>
 const audio = document.getElementById('audio');
 const statusEl = document.getElementById('status');
 
-// Build decorative equalizer bars (visual only - does NOT touch the audio element)
-const eq=document.getElementById('eq'),bars=32,eqels=[];
+// ---- Build the equalizer bars that live ON the picture ----
+const eq=document.getElementById('eq'),bars=40,eqels=[];
 for(let i=0;i<bars;i++){const s=document.createElement('span');eq.appendChild(s);eqels.push(s);}
-let idle=true;
-setInterval(()=>{ for(let i=0;i<bars;i++){ eqels[i].style.height=(idle? (4+Math.random()*18) : (4+Math.random()*42))+'px'; } },90);
 
-// List of working stream sources, tried in order until one plays.
+// ---- Web Audio analyser (reads the REAL music, drives the bars on the picture) ----
+let ctx=null,analyser=null,data=null;
+function initAudio(){
+  if(ctx)return;
+  ctx=new (window.AudioContext||window.webkitAudioContext)();
+  analyser=ctx.createAnalyser();analyser.fftSize=256;
+  const src=ctx.createMediaElementSource(audio);
+  src.connect(analyser);analyser.connect(ctx.destination);
+  data=new Uint8Array(analyser.frequencyBinCount);
+}
+function ensureCtx(){
+  initAudio();
+  if(ctx && ctx.state==='suspended') ctx.resume();
+}
+
+// ---- Live stream sources, tried until one plays ----
 const SOURCES=[
   'http://192.168.0.5:8000/goochi',
   'http://90.207.62.227:8000/goochi',
@@ -62,26 +119,49 @@ let srcIdx=0;
 
 function attempt(idx){
   const url = SOURCES[idx % SOURCES.length];
-  statusEl.textContent = 'Connecting to '+url.replace('http://','')+'...';
-  audio.src = url;
-  audio.play().then(()=>{ statusEl.textContent = 'LIVE 24/7'; idle=false; })
-   .catch(()=>{ statusEl.textContent = 'Tap play to start'; });
+  statusEl.textContent = 'Tuning in...';
+  if(audio.src!==url){ audio.src=url; }
+  audio.play().then(()=>{ statusEl.textContent='LIVE 24/7'; })
+    .catch(()=>{ statusEl.textContent='Tap play to start'; });
 }
 
-// Start trying on load
+// Start on load (muted-first to satisfy autoplay, then unmute)
+audio.muted=true;
 attempt(0);
+setTimeout(()=>{ ensureCtx(); audio.muted=false; }, 900);
 
-// If it fails, advance to next source
-audio.addEventListener('error', ()=>{ srcIdx++; setTimeout(()=>attempt(srcIdx), 800); });
+audio.addEventListener('error', ()=>{ srcIdx++; setTimeout(()=>attempt(srcIdx),800); });
 audio.addEventListener('stalled', ()=>{ if(audio.currentTime===0 && audio.networkState===3){ srcIdx++; attempt(srcIdx);} });
 
-// Subs beat pulse (visual only) - drives off audio playback state
-setInterval(()=>{
-  const playing = !audio.paused && !audio.ended;
-  const d = playing ? (1+Math.random()*0.35) : 1;
-  document.getElementById('subL').firstElementChild.style.transform='scale('+d+')';
-  document.getElementById('subR').firstElementChild.style.transform='scale('+d+')';
-},120);
+// Tap anywhere on the picture to (re)start/resume audio
+document.querySelector('.screen').addEventListener('click',()=>{
+  ensureCtx(); audio.muted=false;
+  if(audio.paused) audio.play().then(()=>statusEl.textContent='LIVE 24/7').catch(()=>{});
+});
+
+// ---- REAL music-driven animation: bars move to the actual audio freq content ----
+let live=false;
+audio.addEventListener('playing',()=>{live=true; statusEl.textContent='LIVE 24/7';});
+audio.addEventListener('pause',()=>{live=false;});
+
+function frame(){
+  requestAnimationFrame(frame);
+  if(analyser && data && !audio.paused && live){
+    analyser.getByteFrequencyData(data);
+    const step=Math.max(1,Math.floor(data.length/bars));
+    for(let i=0;i<bars;i++){
+      const v=data[i*step]/255;
+      eqels[i].style.height=(4 + v*50)+'px';
+    }
+  } else {
+    // idle: gentle bobbing so the speakers still look alive
+    for(let i=0;i<bars;i++){
+      const v=0.08+Math.random()*0.14;
+      eqels[i].style.height=(4 + v*50)+'px';
+    }
+  }
+}
+frame();
 </script>
 </body>
 </html>
